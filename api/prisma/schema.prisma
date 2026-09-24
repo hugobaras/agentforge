@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LotStatus {
+  DRAFT
+  SUBMITTED
+  IMPLEMENTING
+  EVALUATING
+  VERIFYING
+  APPROVED
+  REJECTED
+}
+
+enum AgentRunType {
+  IMPLEMENTER
+  EVALUATOR
+  VERIFIER
+}
+
+enum DecisionType {
+  APPROVE
+  REJECT
+  ARBITRATE
+}
+
+model Tenant {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  githubToken  String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lots         Lot[]
+
+  @@map("tenants")
+}
+
+model Lot {
+  id           String       @id @default(uuid())
+  tenantId     String
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title        String
+  status       LotStatus    @default(DRAFT)
+  repoUrl      String?
+  baseBranch   String       @default("main")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  spec         Spec?
+  agentRuns    AgentRun[]
+  evaluations  Evaluation[]
+  decisions    Decision[]
+  pullRequest  PullRequest?
+
+  @@index([tenantId, status])
+  @@map("lots")
+}
+
+model Spec {
+  id        String   @id @default(uuid())
+  lotId     String   @unique
+  lot       Lot      @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  title     String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("specs")
+}
+
+model AgentRun {
+  id          String       @id @default(uuid())
+  lotId       String
+  lot         Lot          @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  type        AgentRunType
+  deliverable String?      @db.Text
+  startedAt   DateTime     @default(now())
+  finishedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  evaluations Evaluation[]
+
+  @@index([lotId, type])
+  @@map("agent_runs")
+}
+
+model Evaluation {
+  id         String   @id @default(uuid())
+  lotId      String
+  lot        Lot      @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  agentRunId String
+  agentRun   AgentRun @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  score      Int
+  feedback   String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([lotId])
+  @@map("evaluations")
+}
+
+model Decision {
+  id        String       @id @default(uuid())
+  lotId     String
+  lot       Lot          @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  type      DecisionType
+  comment   String?      @db.Text
+  createdAt DateTime     @default(now())
+
+  @@index([lotId])
+  @@map("decisions")
+}
+
+model PullRequest {
+  id        String   @id @default(uuid())
+  lotId     String   @unique
+  lot       Lot      @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  number    Int
+  url       String
+  branch    String
+  headSha   String?
+  createdAt DateTime @default(now())
+
+  @@map("pull_requests")
+}
+
+model ProcessedEvent {
+  id            String   @id @default(uuid())
+  eventId       String
+  topic         String
+  consumerGroup String
+  processedAt   DateTime @default(now())
+
+  @@unique([eventId, consumerGroup])
+  @@index([topic])
+  @@map("processed_events")
+}
