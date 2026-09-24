@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit + e2e Kafka
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Installer
+        run: |
+          cp .env.example .env
+          npm ci
+      - name: Tests frontend
+        run: |
+          npm test --workspace=frontend
+          npm run check --workspace=frontend
+      - name: Tests unit API
+        run: npm test --workspace=api
+      - name: Infra (Postgres + Kafka)
+        run: docker compose up -d postgres zookeeper kafka
+      - name: Attendre l'infra
+        run: |
+          for i in $(seq 1 45); do
+            if docker compose exec -T postgres pg_isready -U agentforge -d agentforge \
+              && docker compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list >/dev/null; then
+              echo "infra ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs --tail=80
+          exit 1
+      - name: Migrations
+        run: npm run prisma:migrate:deploy --workspace=api
+      - name: E2E API (lot → verification.*)
+        run: npm run test:e2e --workspace=api
+        env:
+          CI: true
+
+  compose:
+    name: Compose api + frontend + chaîne
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Stack complète
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+      - name: Chaîne soumission → verification
+        run: node scripts/e2e-chain.mjs
+      - name: Logs en cas d'échec
+        if: failure()
+        run: docker compose logs --tail=200
