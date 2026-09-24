@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+**/.svelte-kit
+**/build
+.git
+.github
+coverage
+*.log
+.env
+.env.*
+!.env.example
+agent-transcripts

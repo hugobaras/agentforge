@@ -1,0 +1,20 @@
+{
+  "name": "agentforge",
+  "private": true,
+  "workspaces": [
+    "api",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev --workspace=api",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "build:api": "npm run build --workspace=api",
+    "build:frontend": "npm run build --workspace=frontend",
+    "db:migrate": "npm run prisma:migrate --workspace=api",
+    "db:migrate:deploy": "npm run prisma:migrate:deploy --workspace=api",
+    "db:seed": "npm run prisma:seed --workspace=api",
+    "db:studio": "npm run prisma:studio --workspace=api",
+    "e2e:chain": "node scripts/e2e-chain.mjs",
+    "demo": "node scripts/demo.mjs"
+  }
+}
